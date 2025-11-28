@@ -1,0 +1,14 @@
+Flask==3.0.0
+Flask-PyMongo==2.3.0
+Werkzeug==3.0.1
+PyJWT==2.8.0
+flask_bcrypt==1.5.0
+flask_jwt_extended==4.4.4
+flask_cors==3.0.10
+opencv-python==4.8.1.78
+ultralytics==8.0.196
+torch==2.0.1
+torchvision==0.15.2
+numpy==1.24.3
+shapely==2.0.1
+pillow==10.0.0

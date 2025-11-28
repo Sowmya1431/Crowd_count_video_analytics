@@ -1,0 +1,243 @@
+/* Users Domain Styles - based on FeedsDomain.css visual language */
+.users-domain {
+  padding: 20px;
+  max-width: 100%;
+  color: #1f2937;
+}
+
+.users-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.users-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.add-user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.add-user-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(76, 175, 80, 0.18);
+  background: #43a047;
+}
+
+.search-bar {
+  margin-bottom: 16px;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  max-width: 460px;
+  min-width: 220px;
+  gap: 10px;
+}
+
+.search-icon {
+  color: #6b7280;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e6e9ee;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #60a05a;
+  box-shadow: 0 4px 18px rgba(76, 175, 80, 0.08);
+}
+
+.table-container {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.user-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.user-table thead {
+  background: #f7faf9;
+}
+
+.user-table th {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  font-size: 13px;
+  border-bottom: 2px solid #eef2f6;
+}
+
+.user-table td {
+  padding: 12px 16px;
+  color: #374151;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.user-table tbody tr {
+  border-bottom: 1px solid #f0f2f4;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.user-table tbody tr:hover {
+  background: #fbfdff;
+  transform: translateY(-1px);
+}
+
+.edit-btn,
+.delete-btn,
+.save-btn,
+.cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+.edit-btn {
+  background: #eef2ff;
+  color: #2563eb;
+}
+
+.edit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
+}
+
+.delete-btn {
+  background: #fff5f5;
+  color: #dc2626;
+  margin-left: 8px;
+}
+
+.delete-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.08);
+}
+
+.save-btn {
+  background: #4CAF50;
+  color: white;
+}
+
+.save-btn:hover { background: #43a047; }
+
+.cancel-btn { background: #eef0f2; color: #374151; }
+
+.editable-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e6e9ee;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  animation: fadeIn 0.18s ease;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 20px 60px rgba(2,6,23,0.2);
+  animation: slideUp 0.22s ease;
+  z-index: 1300;
+  /* centered by the overlay flexbox when nested */
+  position: relative;
+  max-height: 85vh;
+  overflow: hidden;
+}
+
+.modal .modal-form {
+  overflow-y: auto;
+}
+
+.modal-form {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-form h3.add-user {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  color: #111827;
+}
+
+.modal-form input,
+.modal-form select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e6e9ee;
+  font-size: 14px;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(12px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+
+.no-users {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .user-table { min-width: 600px; }
+  .users-header { flex-direction: column; align-items: stretch; }
+  .search-input-wrapper { width: 100%; }
+}
