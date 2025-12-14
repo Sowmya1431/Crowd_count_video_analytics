@@ -990,6 +990,16 @@ def analyze_zone(feed_id):
         min_count = int(np.min(counts))
         # Total unique persons that passed through the zone
         total_persons_passed = len(tracked_persons)
+        # Compute dwell times (in seconds) for each tracked person
+        dwell_times = []
+        try:
+            for p in tracked_persons:
+                first = int(p.get('first_frame', 0))
+                last = int(p.get('last_frame', first))
+                dwell = (last - first) / float(fps) if fps and last >= first else 0.0
+                dwell_times.append(round(dwell, 2))
+        except Exception:
+            dwell_times = []
     except Exception as e:
         logger.error(f"[Analysis] Error calculating statistics: {e}")
         return jsonify({"error": "Error calculating analysis statistics"}), 500
@@ -1009,6 +1019,7 @@ def analyze_zone(feed_id):
         "total_persons_passed": total_persons_passed,
         "counts_per_frame": counts,
         "timestamps": timestamps,
+        "dwell_times": dwell_times,
         "analyzed_at": datetime.utcnow().isoformat(),
         "analyzed_by": current_user_email
     }

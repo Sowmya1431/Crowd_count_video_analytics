@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Video, Square, Check, X, Play, Pause, Maximize2, Trash2, Edit3, BarChart3, Eye, Plus, AlertCircle, User, LogOut, ChevronDown } from 'lucide-react';
 import './UserDashboard.css';
 import { useNavigate } from 'react-router-dom';
+import AnalyticsModal from './AnalyticsModal';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
@@ -22,6 +23,8 @@ const UserDashboard = () => {
   const [videoSrc, setVideoSrc] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [analysis, setAnalysis] = useState(null);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [heatmapPolygon, setHeatmapPolygon] = useState(null);
   const [activeTab, setActiveTab] = useState('draw');
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -857,16 +860,70 @@ const UserDashboard = () => {
         
         const avgCountAcrossZones = successfulResults.length > 0 ? totalAvgCount / successfulResults.length : 0;
         
+        // Build combined time-series (timestamps + counts_per_frame) by aligning per-zone samples
+        let combinedTimestamps = [];
+        let combinedCounts = [];
+
+        if (successfulResults.length > 0) {
+          // Prefer using the first successful result as timebase if it has timestamps
+          const base = successfulResults[0].analysis || {};
+          const baseTimestamps = Array.isArray(base.timestamps) && base.timestamps.length ? base.timestamps : [];
+
+          if (baseTimestamps.length) {
+            combinedTimestamps = baseTimestamps.slice();
+            combinedCounts = new Array(combinedTimestamps.length).fill(0);
+
+            successfulResults.forEach(r => {
+              const a = r.analysis || {};
+              const counts = Array.isArray(a.counts_per_frame) ? a.counts_per_frame : [];
+
+              if (counts.length === combinedCounts.length) {
+                for (let i = 0; i < counts.length; i++) combinedCounts[i] += (counts[i] || 0);
+              } else if (Array.isArray(a.timestamps) && a.timestamps.length) {
+                // map by timestamp string
+                const map = {};
+                a.timestamps.forEach((t, idx) => { map[String(t)] = (a.counts_per_frame && a.counts_per_frame[idx]) || 0; });
+                for (let i = 0; i < combinedTimestamps.length; i++) combinedCounts[i] += (map[String(combinedTimestamps[i])] || 0);
+              } else if (counts.length > 0) {
+                // fallback: approximate mapping by index
+                for (let i = 0; i < combinedCounts.length; i++) {
+                  const idx = Math.floor(i * (counts.length / combinedCounts.length));
+                  combinedCounts[i] += (counts[idx] || 0);
+                }
+              }
+            });
+          } else {
+            // No timestamps available: try to use frames_analyzed or counts length as base
+            const n = (base.frames_analyzed && Number(base.frames_analyzed)) || (Array.isArray(base.counts_per_frame) ? base.counts_per_frame.length : 0);
+            combinedCounts = new Array(n).fill(0);
+
+            successfulResults.forEach(r => {
+              const a = r.analysis || {};
+              const counts = Array.isArray(a.counts_per_frame) ? a.counts_per_frame : [];
+              if (counts.length === combinedCounts.length) {
+                for (let i = 0; i < counts.length; i++) combinedCounts[i] += (counts[i] || 0);
+              } else if (counts.length > 0) {
+                for (let i = 0; i < combinedCounts.length; i++) {
+                  const idx = Math.floor(i * (counts.length / combinedCounts.length));
+                  combinedCounts[i] += (counts[idx] || 0);
+                }
+              }
+            });
+          }
+        }
+
         // Show combined analysis
         setAnalysis({
           zone_name: `All Zones Combined (${successCount} zones)`,
           total_persons_passed: maxPersonsPassed,
           peak_count: totalPeakOccupancy,
           avg_count: avgCountAcrossZones,
-          frames_analyzed: successfulResults.length > 0 ? successfulResults[0].analysis.frames_analyzed : 0,
+          frames_analyzed: combinedCounts.length || (successfulResults.length > 0 ? successfulResults[0].analysis.frames_analyzed : 0),
           fps: successfulResults.length > 0 ? successfulResults[0].analysis.fps : 0,
           duration: successfulResults.length > 0 ? successfulResults[0].analysis.duration : 0,
-          peak_time: successfulResults.length > 0 ? successfulResults[0].analysis.peak_time : 0
+          peak_time: successfulResults.length > 0 ? successfulResults[0].analysis.peak_time : 0,
+          counts_per_frame: combinedCounts,
+          timestamps: combinedTimestamps
         });
       }
       
@@ -1692,7 +1749,16 @@ const UserDashboard = () => {
                           <div className="ud-analysis" onClick={(e) => e.stopPropagation()}>
                             <div className="ud-analysis-header">
                               <h3>Analysis Results</h3>
-                              <button onClick={() => setAnalysis(null)} className="ud-icon-btn"><X /></button>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                  onClick={() => setShowAnalyticsModal(true)}
+                                  className="ud-btn ud-btn-secondary"
+                                  title="Open analytics plots"
+                                >
+                                  Analytics
+                                </button>
+                                <button onClick={() => setAnalysis(null)} className="ud-icon-btn"><X /></button>
+                              </div>
                             </div>
                             <div className="ud-analysis-body">
                               <div className="ud-analysis-title">{analysis.zone_name}</div>
@@ -1725,14 +1791,19 @@ const UserDashboard = () => {
                       
                       {zones.length > 0 && (
                         <div className="ud-zonemgmt">
-                          <div className="ud-zonemgmt-header">
-                            <h3>All Zones Overview</h3>
-                            {selectedFeed !== 'webcam' && (
-                              <button onClick={handleAnalyzeAllZones} disabled={loading} className="ud-btn ud-btn-primary-small">
-                                <BarChart3 className="ud-btn-icon" style={{ width: '14px', height: '14px' }} />
-                                Analyze All
-                              </button>
-                            )}
+                          <div className="ud-zonemgmt-header" style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <h3 style={{ margin: 0 }}>All Zones Overview</h3>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {selectedFeed !== 'webcam' && (
+                                <>
+                                  <button onClick={handleAnalyzeAllZones} disabled={loading} className="ud-btn ud-btn-primary-small">
+                                    <BarChart3 className="ud-btn-icon" style={{ width: '14px', height: '14px' }} />
+                                    Analyze All
+                                  </button>
+                                  {/* View Analytics button removed per request */}
+                                </>
+                              )}
+                            </div>
                           </div>
                           <div className="ud-zonemgmt-body">
                             <div className="ud-zone-list">
@@ -1761,16 +1832,30 @@ const UserDashboard = () => {
                                     </div>
                                   )}
                                   {selectedFeed !== 'webcam' && (
-                                    <div className="ud-zone-actions" style={{ marginTop: '0.75rem' }}>
-                                      <button 
-                                        onClick={() => handleAnalyzeZone(zone.zone_id)} 
-                                        className="ud-btn ud-btn-light"
-                                        style={{ flex: 1 }}
-                                      >
-                                        <BarChart3 style={{ width: '14px', height: '14px' }} />
-                                        Analyze
-                                      </button>
-                                    </div>
+                                      <div className="ud-zone-actions" style={{ marginTop: '0.75rem', display: 'flex', gap: '8px' }}>
+                                        <button 
+                                          onClick={() => handleAnalyzeZone(zone.zone_id)} 
+                                          className="ud-btn ud-btn-light"
+                                          style={{ flex: 1 }}
+                                        >
+                                          <BarChart3 style={{ width: '14px', height: '14px' }} />
+                                          Analyze
+                                        </button>
+                                                {zone.last_analysis && (
+                                                  <button
+                                                    onClick={() => {
+                                                      setAnalysis(zone.last_analysis);
+                                                      setHeatmapPolygon(zone.polygon || null);
+                                                      setShowAnalyticsModal(true);
+                                                      setActiveTab('analysis');
+                                                    }}
+                                                    className="ud-btn ud-btn-secondary"
+                                                    style={{ whiteSpace: 'nowrap' }}
+                                                  >
+                                                    View Plots
+                                                  </button>
+                                                )}
+                                      </div>
                                   )}
                                 </div>
                               ))}
@@ -1787,6 +1872,18 @@ const UserDashboard = () => {
             </div>
           </main>
       </div>
+
+      {showAnalyticsModal && (
+        <AnalyticsModal
+          isOpen={showAnalyticsModal}
+          onClose={() => { setShowAnalyticsModal(false); setHeatmapPolygon(null); }}
+          analysis={analysis}
+          detections={detections}
+          polygon={heatmapPolygon}
+          videoRef={videoRef}
+          previewUrl={selectedFeed ? `${API_BASE}/${selectedFeed}/preview` : null}
+        />
+      )}
 
       {loading && (
         <div className="ud-loading-overlay">
