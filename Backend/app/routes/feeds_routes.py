@@ -1059,6 +1059,67 @@ def analyze_zone(feed_id):
         logger.error(f"[Analysis] Failed to store results: {e}")
         return jsonify({"error": "Failed to save analysis results"}), 500
 
+    # ========================================
+    # CHECK ALERT CONDITIONS AND SEND EMAIL
+    # ========================================
+    try:
+        # Get user alert settings
+        user = mongo.db.users.find_one({"email": current_user_email})
+        if user and user.get("alerts_enabled", True):
+            alert_email = user.get("alert_email", current_user_email)
+            crowd_threshold = float(user.get("crowd_threshold", 70))
+            
+            # Calculate crowd density as percentage
+            # Using peak_count as the max occupancy percentage
+            crowd_density = (peak_count / 100.0) * 100  # If peak_count is already a count, convert to percentage
+            
+            logger.info(f"[Alert] Checking: density={crowd_density:.1f}%, threshold={crowd_threshold:.1f}%")
+            
+            # If crowd density exceeds threshold, send alert email
+            if crowd_density > crowd_threshold:
+                from app.utils.email_service import send_crowd_alert_email
+                
+                feed_name = feed_obj.get("feed_name", feed_obj.get("filename", "Unknown Feed"))
+                zone_name = zone.get("zone_name", "Unknown Zone")
+                
+                logger.info(f"[Alert] 🚨 THRESHOLD EXCEEDED! Sending alert to {alert_email}")
+                success, message = send_crowd_alert_email(
+                    recipient_email=alert_email,
+                    feed_name=feed_name,
+                    zone_name=zone_name,
+                    crowd_density=crowd_density,
+                    threshold=crowd_threshold
+                )
+                
+                if success:
+                    logger.info(f"[Alert] ✅ Alert email sent to {alert_email}")
+                    # Store alert in database for audit trail
+                    try:
+                        mongo.db.alerts.insert_one({
+                            "user_email": current_user_email,
+                            "alert_email": alert_email,
+                            "feed_id": feed_id,
+                            "feed_name": feed_name,
+                            "zone_id": zone_id,
+                            "zone_name": zone_name,
+                            "crowd_density": crowd_density,
+                            "threshold": crowd_threshold,
+                            "sent_at": datetime.utcnow(),
+                            "status": "sent"
+                        })
+                    except Exception as e:
+                        logger.warning(f"[Alert] Failed to log alert to database: {e}")
+                else:
+                    logger.warning(f"[Alert] ⚠️ Failed to send alert: {message}")
+            else:
+                logger.info(f"[Alert] No alert: density ({crowd_density:.1f}%) below threshold ({crowd_threshold:.1f}%)")
+        else:
+            logger.info(f"[Alert] Alerts disabled for user {current_user_email}")
+    
+    except Exception as e:
+        logger.error(f"[Alert] Error checking/sending alert: {e}")
+        traceback.print_exc()
+
     return jsonify({
         "message": "Zone analysis completed successfully",
         "analysis": analysis_summary

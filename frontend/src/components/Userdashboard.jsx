@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, Video, Square, Check, X, Play, Pause, Maximize2, Trash2, Edit3, BarChart3, Eye, Plus, AlertCircle, User, LogOut, ChevronDown } from 'lucide-react';
+import { Camera, Upload, Video, Square, Check, X, Play, Pause, Maximize2, Trash2, Edit3, BarChart3, Eye, Plus, AlertCircle, User, LogOut, ChevronDown, Bell, Mail } from 'lucide-react';
 import './UserDashboard.css';
 import { useNavigate } from 'react-router-dom';
 import AnalyticsModal from './AnalyticsModal';
@@ -41,6 +41,16 @@ const UserDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ message: '', onConfirm: null });
+  
+  // Alert settings state
+  const [showAlertSettingsModal, setShowAlertSettingsModal] = useState(false);
+  const [alertSettings, setAlertSettings] = useState({
+    alert_email: '',
+    crowd_threshold: 70,
+    alerts_enabled: true
+  });
+  const [loadingAlertSettings, setLoadingAlertSettings] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
 
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
@@ -87,6 +97,40 @@ const UserDashboard = () => {
   const handleCancelConfirm = () => {
     setShowConfirmDialog(false);
     setConfirmConfig({ message: '', onConfirm: null });
+  };
+
+  // Play beep sound notification for alerts
+  const playAlertBeep = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // High-pitched alert beep: 3 short beeps
+      oscillator.frequency.value = 1000; // 1000 Hz
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+
+      // First beep
+      oscillator.start(audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.15);
+
+      // Second beep
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + 0.2);
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.35);
+
+      // Third beep
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + 0.4);
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.55);
+
+      oscillator.stop(audioContext.currentTime + 0.55);
+    } catch (err) {
+      console.error('Error playing beep:', err);
+    }
   };
 
   const handleLogout = () => {
@@ -184,6 +228,7 @@ const UserDashboard = () => {
 
   useEffect(() => {
     loadFeeds();
+    loadAlertSettings(); // Load alert settings on mount
     return () => {
       if (videoSrc && videoSrc.startsWith('blob:')) {
         URL.revokeObjectURL(videoSrc);
@@ -193,6 +238,104 @@ const UserDashboard = () => {
       }
     };
   }, []);
+
+  // ========================================
+  // ALERT SETTINGS FUNCTIONS
+  // ========================================
+  
+  const loadAlertSettings = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:5000/api/user/alert-settings', {
+        headers: getHeaders()
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAlertSettings({
+          alert_email: data.alert_email || userEmail,
+          crowd_threshold: data.crowd_threshold || 70,
+          alerts_enabled: data.alerts_enabled !== false
+        });
+      }
+    } catch (err) {
+      console.error('Error loading alert settings:', err);
+    }
+  };
+  
+  const handleSaveAlertSettings = async () => {
+    try {
+      setLoadingAlertSettings(true);
+      
+      if (!alertSettings.alert_email.includes('@')) {
+        showError('Please enter a valid email address');
+        return;
+      }
+      
+      const res = await fetch('http://127.0.0.1:5000/api/user/alert-settings', {
+        method: 'POST',
+        headers: {
+          ...getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          alert_email: alertSettings.alert_email,
+          crowd_threshold: alertSettings.crowd_threshold,
+          alerts_enabled: alertSettings.alerts_enabled
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAlertSettings({
+          alert_email: data.alert_email,
+          crowd_threshold: data.crowd_threshold,
+          alerts_enabled: data.alerts_enabled
+        });
+        showSuccess('Alert settings saved successfully!');
+        setShowAlertSettingsModal(false);
+      } else {
+        const error = await res.json();
+        showError(error.error || 'Failed to save settings');
+      }
+    } catch (err) {
+      console.error('Error saving alert settings:', err);
+      showError('Failed to save alert settings');
+    } finally {
+      setLoadingAlertSettings(false);
+    }
+  };
+  
+  const handleTestAlertEmail = async () => {
+    try {
+      setTestingEmail(true);
+      
+      const res = await fetch('http://127.0.0.1:5000/api/user/test-alert-email', {
+        method: 'POST',
+        headers: {
+          ...getHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: alertSettings.alert_email || userEmail
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        // Play alert beep when test email is sent
+        playAlertBeep();
+        showSuccess('✅ Test email sent! Check your inbox (may take a minute)');
+      } else {
+        showError(data.error || 'Failed to send test email');
+      }
+    } catch (err) {
+      console.error('Error testing email:', err);
+      showError('Failed to send test email');
+    } finally {
+      setTestingEmail(false);
+    }
+  };
 
   const handleVideoFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -785,6 +928,17 @@ const UserDashboard = () => {
       if (res.ok) {
         setAnalysis(data.analysis);
         setActiveTab('analysis');
+        
+        // Check if crowd density exceeds threshold and play alert beep
+        if (alertSettings.alerts_enabled && data.analysis) {
+          const crowdDensity = data.analysis.peak_count || 0;
+          const threshold = alertSettings.crowd_threshold || 70;
+          
+          if (crowdDensity > threshold) {
+            playAlertBeep();
+            showSuccess(`🚨 ALERT! Crowd density (${crowdDensity}) exceeds threshold (${threshold})!`);
+          }
+        }
       } else {
         showError(data.error || 'Zone analysis failed!');
       }
@@ -925,6 +1079,17 @@ const UserDashboard = () => {
           counts_per_frame: combinedCounts,
           timestamps: combinedTimestamps
         });
+
+        // Check if any zone exceeds crowd density threshold and play alert beep
+        if (alertSettings.alerts_enabled) {
+          const threshold = alertSettings.crowd_threshold || 70;
+          const maxZoneDensity = Math.max(...successfulResults.map(r => r.analysis.peak_count || 0));
+          
+          if (maxZoneDensity > threshold) {
+            playAlertBeep();
+            showSuccess(`🚨 ALERT! Max crowd density (${maxZoneDensity}) exceeds threshold (${threshold})!`);
+          }
+        }
       }
       
       if (successCount === zones.length) {
@@ -1285,6 +1450,37 @@ const UserDashboard = () => {
                       </div>
                     </div>
                     <button
+                      onClick={() => {
+                        setShowAlertSettingsModal(true);
+                        setShowProfileMenu(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: '0.875rem 1rem',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#cbd5e1',
+                        fontWeight: 500,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#334155';
+                        e.currentTarget.style.color = '#f1f5f9';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#cbd5e1';
+                      }}
+                    >
+                      <Bell size={16} />
+                      Alert Settings
+                    </button>
+                    <button
                       onClick={handleLogout}
                       style={{
                         width: '100%',
@@ -1365,6 +1561,112 @@ const UserDashboard = () => {
                   className="ud-btn ud-btn-secondary ud-btn-block"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Settings Modal */}
+      {showAlertSettingsModal && (
+        <div className="ud-modal-overlay">
+          <div className="ud-modal" style={{ maxWidth: '500px' }}>
+            <h3 className="ud-modal-title">Alert Settings</h3>
+            <div className="ud-modal-body">
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '1rem',
+                  background: '#1e293b',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={alertSettings.alerts_enabled}
+                    onChange={(e) => setAlertSettings({ ...alertSettings, alerts_enabled: e.target.checked })}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 600, color: alertSettings.alerts_enabled ? '#10b981' : '#94a3b8' }}>
+                    {alertSettings.alerts_enabled ? '✓ Alerts Enabled' : 'Alerts Disabled'}
+                  </span>
+                </label>
+              </div>
+
+              <div className="ud-field">
+                <label className="ud-label">
+                  <Mail size={16} style={{ marginRight: '0.5rem', display: 'inline' }} />
+                  Alert Email Address
+                </label>
+                <input
+                  type="email"
+                  value={alertSettings.alert_email}
+                  onChange={(e) => setAlertSettings({ ...alertSettings, alert_email: e.target.value })}
+                  placeholder="your.email@example.com"
+                  className="ud-input"
+                  disabled={!alertSettings.alerts_enabled}
+                />
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+                  Email where alerts will be sent when crowd density exceeds the threshold
+                </p>
+              </div>
+
+              <div className="ud-field">
+                <label className="ud-label">
+                  <Bell size={16} style={{ marginRight: '0.5rem', display: 'inline' }} />
+                  Crowd Density Threshold (%)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={alertSettings.crowd_threshold}
+                    onChange={(e) => setAlertSettings({ ...alertSettings, crowd_threshold: parseInt(e.target.value) })}
+                    disabled={!alertSettings.alerts_enabled}
+                    style={{ flex: 1, cursor: alertSettings.alerts_enabled ? 'pointer' : 'not-allowed', height: '6px' }}
+                  />
+                  <span style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    color: '#3b82f6',
+                    minWidth: '60px',
+                    textAlign: 'right'
+                  }}>
+                    {alertSettings.crowd_threshold}%
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+                  An alert email will be sent when crowd density exceeds this percentage
+                </p>
+              </div>
+
+              <div className="ud-modal-actions">
+                <button
+                  onClick={handleTestAlertEmail}
+                  disabled={!alertSettings.alerts_enabled || !alertSettings.alert_email.includes('@') || testingEmail}
+                  className="ud-btn ud-btn-secondary ud-btn-block"
+                  style={{ opacity: !alertSettings.alerts_enabled || !alertSettings.alert_email.includes('@') ? 0.5 : 1 }}
+                >
+                  {testingEmail ? 'Sending Test Email...' : 'Send Test Email'}
+                </button>
+                <button
+                  onClick={handleSaveAlertSettings}
+                  disabled={loadingAlertSettings}
+                  className="ud-btn ud-btn-primary ud-btn-block"
+                >
+                  {loadingAlertSettings ? 'Saving...' : 'Save Settings'}
+                </button>
+                <button
+                  onClick={() => setShowAlertSettingsModal(false)}
+                  className="ud-btn ud-btn-secondary ud-btn-block"
+                >
+                  Close
                 </button>
               </div>
             </div>
