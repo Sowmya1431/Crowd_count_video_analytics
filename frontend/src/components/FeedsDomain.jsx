@@ -8,7 +8,7 @@ export default function FeedsDomain() {
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const API_BASE = "http://127.0.0.1:5000/api";
+  const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
   useEffect(() => {
     loadFeeds();

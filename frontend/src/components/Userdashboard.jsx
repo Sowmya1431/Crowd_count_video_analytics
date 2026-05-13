@@ -58,7 +58,7 @@ const UserDashboard = () => {
   const previewContainerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const API_BASE = 'http://127.0.0.1:5000/api/feeds';
+  const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
   const token = typeof window !== 'undefined' ? localStorage?.getItem('token') : null;
 
   const getHeaders = () => ({
@@ -245,7 +245,7 @@ const UserDashboard = () => {
   
   const loadAlertSettings = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/user/alert-settings', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/alert-settings`, {
         headers: getHeaders()
       });
       
@@ -271,7 +271,7 @@ const UserDashboard = () => {
         return;
       }
       
-      const res = await fetch('http://127.0.0.1:5000/api/user/alert-settings', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/alert-settings`, {
         method: 'POST',
         headers: {
           ...getHeaders(),
@@ -309,7 +309,7 @@ const UserDashboard = () => {
     try {
       setTestingEmail(true);
       
-      const res = await fetch('http://127.0.0.1:5000/api/user/test-alert-email', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/test-alert-email`, {
         method: 'POST',
         headers: {
           ...getHeaders(),

@@ -22,8 +22,10 @@ export default function AdminDashboard() {
 
   const refreshCount = async () => {
     try {
+
+      
       const token = localStorage.getItem("token");
-      const res = await fetch("http://127.0.0.1:5000/api/admin/users", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return setUserCount(0);
@@ -38,7 +40,7 @@ export default function AdminDashboard() {
   const refreshFeedCount = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://127.0.0.1:5000/api/admin/feeds", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/feeds`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return setFeedCount(0);
@@ -54,7 +56,7 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
-      const res = await fetch("http://127.0.0.1:5000/api/admin/profile", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;

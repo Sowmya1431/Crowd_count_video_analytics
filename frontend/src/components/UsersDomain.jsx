@@ -31,7 +31,7 @@ export default function UsersDomain({ onUsersChanged }) {
       console.log("Fetching users with token:", token ? "Token exists" : "No token");
       console.log("User role:", role);
       
-      const res = await fetch("http://127.0.0.1:5000/api/admin/users", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
@@ -63,7 +63,7 @@ export default function UsersDomain({ onUsersChanged }) {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://127.0.0.1:5000/api/admin/users/${userId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${userId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -97,7 +97,7 @@ export default function UsersDomain({ onUsersChanged }) {
   const handleUpdate = async (userId) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://127.0.0.1:5000/api/admin/users/${userId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -123,7 +123,7 @@ export default function UsersDomain({ onUsersChanged }) {
     }
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://127.0.0.1:5000/api/admin/users", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -4,8 +4,7 @@
 import requests
 import json
 
-BASE_URL = "http://127.0.0.1:5000/api"
-
+BASE_URL = "https://crowd-count-video-analytics.onrender.com/api"
 def test_register():
     print("\n=== Testing Registration ===")
     # Register as user

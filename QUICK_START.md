@@ -80,7 +80,7 @@ Alert Time: 2024-03-29 14:30:45
 ### In Browser Console
 ```javascript
 // Fetch alert settings
-fetch('http://127.0.0.1:5000/api/user/alert-settings', {
+fetch(`${import.meta.env.VITE_API_URL}/api/user/alert-settings`, {
   headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
 }).then(r => r.json()).then(console.log)
 ```
