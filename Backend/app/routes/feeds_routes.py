@@ -549,18 +549,27 @@ def serve_video(feed_id):
 @jwt_required()
 def list_feeds():
     """List all feeds for the current user."""
-    current_user_email = _get_email_from_jwt()
-    if not current_user_email:
-        return jsonify({"error": "Unable to identify user"}), 401
-
     try:
+        logger.info("[List] Request received")
+        current_user_email = _get_email_from_jwt()
+        logger.info(f"[List] Email extracted: {current_user_email}")
+        
+        if not current_user_email:
+            logger.warning("[List] No email in JWT")
+            return jsonify({"error": "Unable to identify user"}), 401
+
+        logger.info("[List] Querying MongoDB for feeds")
         docs = mongo.db.feeds.find(
             {"email": current_user_email},
             {"detections_cache": 0}
         ).sort("upload_time", -1)
+        logger.info("[List] Query executed successfully")
     except Exception as e:
-        logger.error(f"[List] DB query failed: {e}")
-        return jsonify({"error": "Database query failed"}), 500
+        logger.error(f"[List] DB query failed: {type(e).__name__}: {str(e)}")
+        logger.error(f"[List] Full error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Database query failed: {str(e)}"}), 500
 
     feeds = []
     for f in docs:
