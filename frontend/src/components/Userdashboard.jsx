@@ -227,27 +227,35 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
     try {
       const token = getToken();
       if (!token) {
-        console.warn('No token found, redirecting to login');
+        console.warn('[Feeds] No token found, redirecting to login');
         navigate('/');
         return;
       }
 
+      console.log('[Feeds] Loading feeds with API_BASE:', API_BASE);
       setLoading(true);
       const res = await fetch(API_BASE, {
         headers: getHeaders()
       });
       
+      console.log('[Feeds] Response status:', res.status);
+      
       if (res.status === 401) {
-        console.warn('Token invalid/expired');
+        console.warn('[Feeds] Token invalid/expired');
         localStorage.removeItem('token');
         localStorage.removeItem('userEmail');
         navigate('/');
         return;
       }
 
-      if (!res.ok) throw new Error('Failed to load feeds');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error('[Feeds] Error response:', res.status, errorData);
+        throw new Error(`Failed to load feeds: ${res.status}`);
+      }
       
       const data = await res.json();
+      console.log('[Feeds] Loaded successfully:', data.feeds?.length, 'feeds');
       setFeeds(data.feeds || []);
     } catch (err) {
       console.error('Error loading feeds', err);
@@ -277,26 +285,38 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
   const loadAlertSettings = async () => {
     try {
       const token = getToken();
-      if (!token) return; // Skip if no token
+      if (!token) {
+        console.warn('[Alert] No token, skipping load');
+        return;
+      }
 
+      console.log('[Alert] Loading alert settings...');
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/alert-settings`, {
         headers: getHeaders()
       });
       
+      console.log('[Alert] Response status:', res.status);
+      
       if (res.status === 401) {
+        console.warn('[Alert] Token invalid/expired');
         localStorage.removeItem('token');
         navigate('/');
         return;
       }
 
-      if (res.ok) {
-        const data = await res.json();
-        setAlertSettings({
-          alert_email: data.alert_email || userEmail,
-          crowd_threshold: data.crowd_threshold || 70,
-          alerts_enabled: data.alerts_enabled !== false
-        });
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('[Alert] Error response:', errorData);
+        return;
       }
+
+      const data = await res.json();
+      console.log('[Alert] Loaded successfully:', data);
+      setAlertSettings({
+        alert_email: data.alert_email || userEmail,
+        crowd_threshold: data.crowd_threshold || 70,
+        alerts_enabled: data.alerts_enabled !== false
+      });
     } catch (err) {
       console.error('Error loading alert settings:', err);
     }
@@ -428,8 +448,10 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
   `Bearer ${getToken()}`
 );
       xhr.onload = async () => {
+        console.log('[Upload] Response status:', xhr.status);
         if (xhr.status === 200) {
           const data = JSON.parse(xhr.responseText);
+          console.log('[Upload] Success:', data);
           setUploading(false);
           setUploadProgress(0);
           
@@ -458,8 +480,14 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
             pollProcessingStatus(data.feed_id);
           }
         } else {
-          const error = JSON.parse(xhr.responseText);
-          showError(error.error || 'Upload failed!');
+          try {
+            const error = JSON.parse(xhr.responseText);
+            console.error('[Upload] Error response:', xhr.status, error);
+            showError(error.error || `Upload failed! (${xhr.status})`);
+          } catch (e) {
+            console.error('[Upload] Failed to parse error response:', xhr.responseText);
+            showError(`Upload failed! Status: ${xhr.status}`);
+          }
           setUploading(false);
           setUploadProgress(0);
         }
