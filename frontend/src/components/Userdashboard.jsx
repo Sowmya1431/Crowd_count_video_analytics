@@ -432,6 +432,15 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
     formData.append('video', videoFile);
     formData.append('feed_name', feedNameInput.trim());
 
+    console.log('[Upload] Uploading:', {
+      fileName: videoFile.name,
+      fileSize: videoFile.size,
+      fileType: videoFile.type,
+      feedName: feedNameInput.trim(),
+      url: `${API_BASE}/upload`,
+      tokenLength: getToken().length
+    });
+
     try {
       const xhr = new XMLHttpRequest();
       
@@ -449,6 +458,9 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
 );
       xhr.onload = async () => {
         console.log('[Upload] Response status:', xhr.status);
+        console.log('[Upload] Response text:', xhr.responseText);
+        console.log('[Upload] Response headers:', xhr.getAllResponseHeaders());
+        
         if (xhr.status === 200) {
           const data = JSON.parse(xhr.responseText);
           console.log('[Upload] Success:', data);
@@ -486,7 +498,7 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
             showError(error.error || `Upload failed! (${xhr.status})`);
           } catch (e) {
             console.error('[Upload] Failed to parse error response:', xhr.responseText);
-            showError(`Upload failed! Status: ${xhr.status}`);
+            showError(`Upload failed! Status: ${xhr.status} - ${xhr.responseText}`);
           }
           setUploading(false);
           setUploadProgress(0);

@@ -247,46 +247,56 @@ def _is_box_in_zone(box, polygon):
 @jwt_required()
 def upload_video():
     """Handle video upload and store in MongoDB GridFS. Detection happens later after zones are defined."""
-    init_gridfs()
-    
-    current_user_email = _get_email_from_jwt()
-    if not current_user_email:
-        return jsonify({"error": "Unable to identify user"}), 401
-
-    if "video" not in request.files:
-        return jsonify({"error": "No video file uploaded"}), 400
-
-    video_file = request.files["video"]
-    feed_name = request.form.get("feed_name", "").strip()
-    
-    if not video_file or video_file.filename == "":
-        return jsonify({"error": "No video file selected"}), 400
-    
-    ext = os.path.splitext(video_file.filename)[1].lower()
-    if ext not in [".mp4", ".avi", ".mov", ".mkv", ".webm"]:
-        return jsonify({"error": "Invalid file type. Supported: mp4, avi, mov, mkv, webm"}), 400
-
-    if not feed_name:
-        feed_name = os.path.splitext(video_file.filename)[0]
-
-    timestamp = int(time.time())
-    safe_basename = "".join(c for c in feed_name if c.isalnum() or c in (' ', '-', '_')).strip()
-    if not safe_basename:
-        safe_basename = "video"
-    filename = f"{safe_basename}_{timestamp}{ext}"
-
-    temp_path = None
-    video_id = None
-
     try:
-        # Read video file into memory
-        logger.info(f"[Upload] Reading video file: {video_file.filename}")
-        video_bytes = video_file.read()
+        init_gridfs()
         
-        if len(video_bytes) == 0:
-            return jsonify({"error": "Empty video file"}), 400
+        logger.info(f"[Upload] Request received. Content-Type: {request.content_type}")
+        logger.info(f"[Upload] Request files: {list(request.files.keys())}")
+        logger.info(f"[Upload] Request form: {list(request.form.keys())}")
         
-        logger.info(f"[Upload] Video size: {len(video_bytes)} bytes")
+        current_user_email = _get_email_from_jwt()
+        if not current_user_email:
+            logger.warning("[Upload] Unable to extract email from JWT")
+            return jsonify({"error": "Unable to identify user"}), 401
+
+        if "video" not in request.files:
+            logger.warning(f"[Upload] No 'video' field in request. Available fields: {list(request.files.keys())}")
+            return jsonify({"error": "No video file uploaded"}), 400
+
+        video_file = request.files["video"]
+        feed_name = request.form.get("feed_name", "").strip()
+        
+        logger.info(f"[Upload] Video file: {video_file.filename}, Feed name: {feed_name}")
+        
+        if not video_file or video_file.filename == "":
+            return jsonify({"error": "No video file selected"}), 400
+        
+        ext = os.path.splitext(video_file.filename)[1].lower()
+        if ext not in [".mp4", ".avi", ".mov", ".mkv", ".webm"]:
+            logger.warning(f"[Upload] Invalid extension: {ext}")
+            return jsonify({"error": "Invalid file type. Supported: mp4, avi, mov, mkv, webm"}), 400
+
+        if not feed_name:
+            feed_name = os.path.splitext(video_file.filename)[0]
+
+        timestamp = int(time.time())
+        safe_basename = "".join(c for c in feed_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if not safe_basename:
+            safe_basename = "video"
+        filename = f"{safe_basename}_{timestamp}{ext}"
+
+        temp_path = None
+        video_id = None
+
+        try:
+            # Read video file into memory
+            logger.info(f"[Upload] Reading video file: {video_file.filename}")
+            video_bytes = video_file.read()
+            
+            if len(video_bytes) == 0:
+                return jsonify({"error": "Empty video file"}), 400
+            
+            logger.info(f"[Upload] Video size: {len(video_bytes)} bytes")
         
         # Store in GridFS
         video_id = fs.put(
@@ -448,6 +458,15 @@ def upload_video():
         "video_metadata": feed_doc["video_metadata"],
         "first_frame": first_frame_base64
     }), 200
+    
+    except Exception as e:
+        logger.error(f"[Upload] Unexpected error: {str(e)}")
+        logger.error(f"[Upload] Error type: {type(e).__name__}")
+        traceback.print_exc()
+        return jsonify({
+            "error": f"Upload failed: {str(e)}",
+            "error_type": type(e).__name__
+        }), 500
 
 
 # -------------------------

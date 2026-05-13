@@ -12,3 +12,6 @@ class Config:
     )
 
     MONGO_URI = os.getenv("MONGO_URI")
+    
+    # Allow large file uploads (500MB)
+    MAX_CONTENT_LENGTH = 500 * 1024 * 1024
