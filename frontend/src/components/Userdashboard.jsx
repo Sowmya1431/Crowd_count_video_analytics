@@ -213,11 +213,26 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
 
   const loadFeeds = async () => {
     try {
+      const token = getToken();
+      if (!token) {
+        console.warn('No token found, redirecting to login');
+        navigate('/');
+        return;
+      }
+
       setLoading(true);
       const res = await fetch(API_BASE, {
         headers: getHeaders()
       });
       
+      if (res.status === 401) {
+        console.warn('Token invalid/expired');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userEmail');
+        navigate('/');
+        return;
+      }
+
       if (!res.ok) throw new Error('Failed to load feeds');
       
       const data = await res.json();
@@ -249,10 +264,19 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
   
   const loadAlertSettings = async () => {
     try {
+      const token = getToken();
+      if (!token) return; // Skip if no token
+
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/user/alert-settings`, {
         headers: getHeaders()
       });
       
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
         setAlertSettings({
