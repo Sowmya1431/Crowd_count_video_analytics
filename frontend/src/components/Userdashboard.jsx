@@ -58,9 +58,13 @@ const UserDashboard = () => {
   const previewContainerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const getToken = () => localStorage.getItem('token');
-  const getHeaders = () => ({
-  Authorization: `Bearer ${getToken()}`
+const getToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? token.trim() : '';
+};
+const getHeaders = () => ({
+  'Authorization': `Bearer ${getToken()}`,
+  'Content-Type': 'application/json'
 });
   const showNotification = (message, type = 'info') => {
     const id = Date.now();
