@@ -31,6 +31,7 @@ export default function Login({ onBack }) {
       if (res.ok) {
         setMessage("✅ Login successful!");
         localStorage.setItem("token", data.token);
+        localStorage.setItem("userEmail", data.email || "");
         localStorage.setItem("role", data.role);
         localStorage.setItem("firstName", data.firstName || "");
         localStorage.setItem("lastName", data.lastName || "");

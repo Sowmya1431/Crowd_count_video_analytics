@@ -60,12 +60,24 @@ const UserDashboard = () => {
 
 const getToken = () => {
   const token = localStorage.getItem('token');
-  return token ? token.trim() : '';
+  if (!token) {
+    console.warn('[Auth] No token found in localStorage');
+    return '';
+  }
+  const trimmedToken = token.trim();
+  if (trimmedToken !== token) {
+    console.warn('[Auth] Token had whitespace, trimmed');
+  }
+  console.log('[Auth] Token available, length:', trimmedToken.length);
+  return trimmedToken;
 };
-const getHeaders = () => ({
-  'Authorization': `Bearer ${getToken()}`,
-  'Content-Type': 'application/json'
-});
+const getHeaders = () => {
+  const token = getToken();
+  return {
+    'Authorization': token ? `Bearer ${token}` : '',
+    'Content-Type': 'application/json'
+  };
+};
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
 
