@@ -297,167 +297,167 @@ def upload_video():
                 return jsonify({"error": "Empty video file"}), 400
             
             logger.info(f"[Upload] Video size: {len(video_bytes)} bytes")
-        
-        # Store in GridFS
-        video_id = fs.put(
-            video_bytes,
-            filename=filename,
-            content_type=video_file.content_type or 'video/mp4',
-            upload_date=datetime.utcnow(),
-            metadata={
-                "owner": current_user_email,
-                "original_filename": video_file.filename,
-                "feed_name": feed_name
-            }
-        )
-        
-        logger.info(f"[Upload] ✅ Video stored in GridFS: {filename} (ID: {video_id})")
-    except Exception as e:
-        logger.error(f"[Upload] Failed to store video in GridFS: {e}")
-        traceback.print_exc()
-        return jsonify({"error": f"Failed to save video: {str(e)}"}), 500
-
-    # Extract video metadata for frontend
-    try:
-        # Ensure temp directory exists
-        os.makedirs(TEMP_DIR, exist_ok=True)
-        
-        # Save temporarily for OpenCV processing
-        temp_path = os.path.join(TEMP_DIR, f"temp_{filename}")
-        logger.info(f"[Upload] Saving temp file to: {temp_path}")
-        
-        with open(temp_path, 'wb') as f:
-            f.write(video_bytes)
-        
-        logger.info(f"[Upload] Extracting video metadata: {temp_path}")
-        cap = cv2.VideoCapture(temp_path)
-        
-        if not cap.isOpened():
-            raise Exception("Could not open video file")
             
-    except Exception as e:
-        logger.error(f"[Upload] Failed to process video: {e}")
-        traceback.print_exc()
+            # Store in GridFS
+            video_id = fs.put(
+                video_bytes,
+                filename=filename,
+                content_type=video_file.content_type or 'video/mp4',
+                upload_date=datetime.utcnow(),
+                metadata={
+                    "owner": current_user_email,
+                    "original_filename": video_file.filename,
+                    "feed_name": feed_name
+                }
+            )
+            
+            logger.info(f"[Upload] ✅ Video stored in GridFS: {filename} (ID: {video_id})")
+        except Exception as e:
+            logger.error(f"[Upload] Failed to store video in GridFS: {e}")
+            traceback.print_exc()
+            return jsonify({"error": f"Failed to save video: {str(e)}"}), 500
+
+        # Extract video metadata for frontend
+        try:
+            # Ensure temp directory exists
+            os.makedirs(TEMP_DIR, exist_ok=True)
+            
+            # Save temporarily for OpenCV processing
+            temp_path = os.path.join(TEMP_DIR, f"temp_{filename}")
+            logger.info(f"[Upload] Saving temp file to: {temp_path}")
+            
+            with open(temp_path, 'wb') as f:
+                f.write(video_bytes)
+            
+            logger.info(f"[Upload] Extracting video metadata: {temp_path}")
+            cap = cv2.VideoCapture(temp_path)
+            
+            if not cap.isOpened():
+                raise Exception("Could not open video file")
+                
+        except Exception as e:
+            logger.error(f"[Upload] Failed to process video: {e}")
+            traceback.print_exc()
+            cleanup_temp_file(temp_path)
+            
+            # Delete from GridFS if upload failed
+            if video_id:
+                try:
+                    fs.delete(video_id)
+                except:
+                    pass
+            
+            return jsonify({"error": f"Could not process video: {str(e)}"}), 500
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        if width == 0 or height == 0:
+            width, height = int(cap.get(3)), int(cap.get(4))
+        
+        if width == 0 or height == 0:
+            width, height = 640, 480  # Default fallback
+        
+        # Extract first frame for preview (base64 encoded)
+        ret, first_frame = cap.read()
+        first_frame_base64 = None
+        if ret and first_frame is not None:
+            try:
+                import base64
+                _, buffer = cv2.imencode('.jpg', first_frame)
+                first_frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            except Exception as e:
+                logger.warning(f"[Upload] Failed to encode first frame: {e}")
+        
+        # Generate detections for video playback
+        logger.info(f"[Upload] Generating detections for video playback...")
+        detections_cache = []
+        try:
+            cap2 = cv2.VideoCapture(temp_path)
+            frame_idx = 0
+            frame_step = max(1, int(fps / 5))  # Sample at 5 fps for performance
+            
+            while True:
+                ret, frame = cap2.read()
+                if not ret:
+                    break
+                
+                if frame_idx % frame_step == 0:
+                    try:
+                        boxes = DETECTOR(frame)
+                        timestamp = frame_idx / fps
+                        detections_cache.append({
+                            "timestamp": timestamp,
+                            "frame": frame_idx,
+                            "boxes": _boxes_to_serializable(boxes)
+                        })
+                    except Exception as e:
+                        logger.warning(f"Detection error at frame {frame_idx}: {e}")
+                
+                frame_idx += 1
+                
+                # Show progress every 100 frames
+                if frame_idx % 100 == 0:
+                    logger.info(f"[Upload] Processed {frame_idx}/{total_frames} frames...")
+            
+            cap2.release()
+            logger.info(f"[Upload] ✅ Generated {len(detections_cache)} detection samples")
+        except Exception as e:
+            logger.error(f"[Upload] Failed to generate detections: {e}")
+            detections_cache = []
+        
+        cap.release()
         cleanup_temp_file(temp_path)
         
-        # Delete from GridFS if upload failed
-        if video_id:
-            try:
-                fs.delete(video_id)
-            except:
-                pass
+        duration = round(total_frames / fps, 2) if total_frames > 0 and fps > 0 else 0.0
         
-        return jsonify({"error": f"Could not process video: {str(e)}"}), 500
+        logger.info(f"[Upload] Video properties - FPS: {fps}, Size: {width}x{height}, Frames: {total_frames}, Duration: {duration}s")
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    if width == 0 or height == 0:
-        width, height = int(cap.get(3)), int(cap.get(4))
-    
-    if width == 0 or height == 0:
-        width, height = 640, 480  # Default fallback
-    
-    # Extract first frame for preview (base64 encoded)
-    ret, first_frame = cap.read()
-    first_frame_base64 = None
-    if ret and first_frame is not None:
+        feed_doc = {
+            "email": current_user_email,
+            "feed_name": feed_name,
+            "filename": filename,
+            "video_id": video_id,  # GridFS file ID
+            "upload_time": datetime.utcnow(),
+            "video_metadata": {
+                "width": width,
+                "height": height,
+                "fps": float(fps),
+                "total_frames": total_frames,
+                "duration": duration
+            },
+            "zones": [],
+            "detections_cache": detections_cache,  # Populated during upload for video playback
+            "analysis_history": [],  # Store all zone analyses
+            "first_frame": first_frame_base64
+        }
+
         try:
-            import base64
-            _, buffer = cv2.imencode('.jpg', first_frame)
-            first_frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            res = mongo.db.feeds.insert_one(feed_doc)
+            feed_id = str(res.inserted_id)
+            logger.info(f"[Upload] ✅ Feed created: {feed_id}")
         except Exception as e:
-            logger.warning(f"[Upload] Failed to encode first frame: {e}")
-    
-    # Generate detections for video playback
-    logger.info(f"[Upload] Generating detections for video playback...")
-    detections_cache = []
-    try:
-        cap2 = cv2.VideoCapture(temp_path)
-        frame_idx = 0
-        frame_step = max(1, int(fps / 5))  # Sample at 5 fps for performance
-        
-        while True:
-            ret, frame = cap2.read()
-            if not ret:
-                break
+            logger.error(f"[Upload] DB insert failed: {e}")
+            traceback.print_exc()
             
-            if frame_idx % frame_step == 0:
+            # Delete from GridFS if DB insert failed
+            if video_id:
                 try:
-                    boxes = DETECTOR(frame)
-                    timestamp = frame_idx / fps
-                    detections_cache.append({
-                        "timestamp": timestamp,
-                        "frame": frame_idx,
-                        "boxes": _boxes_to_serializable(boxes)
-                    })
-                except Exception as e:
-                    logger.warning(f"Detection error at frame {frame_idx}: {e}")
+                    fs.delete(video_id)
+                except:
+                    pass
             
-            frame_idx += 1
-            
-            # Show progress every 100 frames
-            if frame_idx % 100 == 0:
-                logger.info(f"[Upload] Processed {frame_idx}/{total_frames} frames...")
-        
-        cap2.release()
-        logger.info(f"[Upload] ✅ Generated {len(detections_cache)} detection samples")
-    except Exception as e:
-        logger.error(f"[Upload] Failed to generate detections: {e}")
-        detections_cache = []
-    
-    cap.release()
-    cleanup_temp_file(temp_path)
-    
-    duration = round(total_frames / fps, 2) if total_frames > 0 and fps > 0 else 0.0
-    
-    logger.info(f"[Upload] Video properties - FPS: {fps}, Size: {width}x{height}, Frames: {total_frames}, Duration: {duration}s")
+            return jsonify({"error": "Database insert failed"}), 500
 
-    feed_doc = {
-        "email": current_user_email,
-        "feed_name": feed_name,
-        "filename": filename,
-        "video_id": video_id,  # GridFS file ID
-        "upload_time": datetime.utcnow(),
-        "video_metadata": {
-            "width": width,
-            "height": height,
-            "fps": float(fps),
-            "total_frames": total_frames,
-            "duration": duration
-        },
-        "zones": [],
-        "detections_cache": detections_cache,  # Populated during upload for video playback
-        "analysis_history": [],  # Store all zone analyses
-        "first_frame": first_frame_base64
-    }
-
-    try:
-        res = mongo.db.feeds.insert_one(feed_doc)
-        feed_id = str(res.inserted_id)
-        logger.info(f"[Upload] ✅ Feed created: {feed_id}")
-    except Exception as e:
-        logger.error(f"[Upload] DB insert failed: {e}")
-        traceback.print_exc()
-        
-        # Delete from GridFS if DB insert failed
-        if video_id:
-            try:
-                fs.delete(video_id)
-            except:
-                pass
-        
-        return jsonify({"error": "Database insert failed"}), 500
-
-    return jsonify({
-        "message": "Video uploaded successfully. Draw zones and analyze.",
-        "feed_id": feed_id,
-        "feed_name": feed_name,
-        "video_metadata": feed_doc["video_metadata"],
-        "first_frame": first_frame_base64
-    }), 200
+        return jsonify({
+            "message": "Video uploaded successfully. Draw zones and analyze.",
+            "feed_id": feed_id,
+            "feed_name": feed_name,
+            "video_metadata": feed_doc["video_metadata"],
+            "first_frame": first_frame_base64
+        }), 200
     
     except Exception as e:
         logger.error(f"[Upload] Unexpected error: {str(e)}")
