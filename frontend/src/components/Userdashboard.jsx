@@ -58,13 +58,10 @@ const UserDashboard = () => {
   const previewContainerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
-  const token = typeof window !== 'undefined' ? localStorage?.getItem('token') : null;
-
+  const getToken = () => localStorage.getItem('token');
   const getHeaders = () => ({
-    'Authorization': `Bearer ${token}`
-  });
-
+  Authorization: `Bearer ${getToken()}`
+});
   const showNotification = (message, type = 'info') => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
@@ -383,8 +380,10 @@ const UserDashboard = () => {
       });
 
       xhr.open('POST', `${API_BASE}/upload`);
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
+      xhr.setRequestHeader(
+  'Authorization',
+  `Bearer ${getToken()}`
+);
       xhr.onload = async () => {
         if (xhr.status === 200) {
           const data = JSON.parse(xhr.responseText);
@@ -471,7 +470,7 @@ const UserDashboard = () => {
         
         if (feed._id) {
           // Set video source with token as query parameter
-          const videoUrl = `${API_BASE}/video/${feed._id}?token=${token}`;
+          const videoUrl = `${API_BASE}/video/${feed._id}?token=${getToken()}`;
           setVideoSrc(videoUrl);
           
           // Load video in video element
@@ -617,7 +616,7 @@ const UserDashboard = () => {
         try {
           const res = await fetch(`${API_BASE}/analyze_frame`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+            headers: getHeaders(),
             body: fd
           });
           
