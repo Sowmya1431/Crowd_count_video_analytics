@@ -174,11 +174,7 @@ DETECTOR = init_detector()
 def _get_email_from_jwt():
     """Extract email from JWT identity."""
     try:
-        ident = get_jwt_identity()
-        if isinstance(ident, str):
-            return ident
-        if isinstance(ident, dict):
-            return ident.get("email")
+        return get_jwt_identity()
     except Exception as e:
         logger.error(f"JWT extraction error: {e}")
     return None

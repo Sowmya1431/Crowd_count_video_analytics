@@ -48,7 +48,7 @@ def login():
 
     user = mongo.db.users.find_one({"email": email, "role": role})
     if user and bcrypt.check_password_hash(user["password"], password):
-        token = create_access_token(identity={"email": email, "role": role}, expires_delta=timedelta(hours=1))
+        token = create_access_token(identity=email, expires_delta=timedelta(hours=1))
         return jsonify({
             "message": "Login successful",
             "token": token,
