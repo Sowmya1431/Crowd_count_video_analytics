@@ -66,6 +66,9 @@ const getHeaders = () => ({
   'Authorization': `Bearer ${getToken()}`,
   'Content-Type': 'application/json'
 });
+
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/feeds`;
+
   const showNotification = (message, type = 'info') => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
